@@ -112,4 +112,4 @@ if st.button("Analyze Sentiment"):
         if results:
             overall = max(set(results), key=results.count)
             st.subheader(f"⭐ Overall Sentiment: {overall.upper()}")
-``
+
