@@ -1,4 +1,3 @@
-
 import streamlit as st
 import torch
 import re
@@ -8,10 +7,10 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 # =========================
 # APP SETTINGS
 # =========================
-st.set_page_config(page_title="Urdu Sentiment Analyzer")
+st.set_page_config(page_title="Urdu Sentiment Analyzer", layout="centered")
 
 st.title("🧠 Urdu Sentiment Analysis App")
-st.write("Enter Urdu text (sentence or paragraph) to analyze sentiment.")
+st.write("Analyze Urdu text for Positive, Negative, or Neutral sentiment.")
 
 # =========================
 # LOAD MODEL FROM HUGGING FACE
@@ -29,7 +28,7 @@ def load_model():
 tokenizer, model = load_model()
 
 # =========================
-# DEVICE SETUP
+# DEVICE
 # =========================
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
@@ -43,7 +42,7 @@ def split_urdu_sentences(text):
     return [s.strip() for s in sentences if len(s.strip()) > 2]
 
 # =========================
-# PREDICT SENTIMENT
+# IMPROVED PREDICTION FUNCTION ✅
 # =========================
 def predict_sentiment(sentence):
 
@@ -59,10 +58,19 @@ def predict_sentiment(sentence):
 
     with torch.no_grad():
         outputs = model(**inputs)
-        probabilities = F.softmax(outputs.logits, dim=-1)
+        probs = F.softmax(outputs.logits, dim=-1)
 
-    confidence, predicted_class = torch.max(probabilities, dim=1)
+    probs = probs[0]
+    confidence, predicted_class = torch.max(probs, dim=0)
+
     label = model.config.id2label[predicted_class.item()]
+
+    # ✅ IMPROVEMENT: fix weak negative predictions
+    if label == "neutral":
+        negative_index = [k for k, v in model.config.id2label.items() if v == "negative"][0]
+        
+        if probs[negative_index] > 0.30:
+            label = "negative"
 
     return label, float(confidence)
 
@@ -72,7 +80,7 @@ def predict_sentiment(sentence):
 user_input = st.text_area("✍️ Enter Urdu text:", height=150)
 
 # =========================
-# BUTTON ACTION
+# ANALYZE BUTTON
 # =========================
 if st.button("Analyze Sentiment"):
 
@@ -104,3 +112,4 @@ if st.button("Analyze Sentiment"):
         if results:
             overall = max(set(results), key=results.count)
             st.subheader(f"⭐ Overall Sentiment: {overall.upper()}")
+``
