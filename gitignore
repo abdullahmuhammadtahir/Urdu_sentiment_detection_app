@@ -1,0 +1,6 @@
+model/
+*.bin
+*.safetensors
+*.ipynb
+*.csv
+*.xlsx
