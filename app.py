@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 # =========================
-# APP SETTINGS
+# APP CONFIG
 # =========================
 st.set_page_config(page_title="Urdu Sentiment Analyzer", layout="centered")
 
@@ -13,7 +13,7 @@ st.title("🧠 Urdu Sentiment Analysis App")
 st.write("Analyze Urdu text for Positive, Negative, or Neutral sentiment.")
 
 # =========================
-# LOAD MODEL FROM HUGGING FACE
+# LOAD MODEL (Hugging Face)
 # =========================
 @st.cache_resource
 def load_model():
@@ -28,21 +28,21 @@ def load_model():
 tokenizer, model = load_model()
 
 # =========================
-# DEVICE
+# DEVICE SETUP
 # =========================
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 model.eval()
 
 # =========================
-# SPLIT URDU SENTENCES
+# SPLIT SENTENCES
 # =========================
 def split_urdu_sentences(text):
     sentences = re.split(r"[۔?!]", text)
     return [s.strip() for s in sentences if len(s.strip()) > 2]
 
 # =========================
-# IMPROVED PREDICTION FUNCTION ✅
+# ADVANCED PREDICTION ✅
 # =========================
 def predict_sentiment(sentence):
 
@@ -61,18 +61,28 @@ def predict_sentiment(sentence):
         probs = F.softmax(outputs.logits, dim=-1)
 
     probs = probs[0]
-    confidence, predicted_class = torch.max(probs, dim=0)
 
-    label = model.config.id2label[predicted_class.item()]
+    # get all class probabilities
+    label_map = model.config.id2label
+    prob_dict = {label_map[i]: probs[i].item() for i in range(len(probs))}
 
-    # ✅ IMPROVEMENT: fix weak negative predictions
-    if label == "neutral":
-        negative_index = [k for k, v in model.config.id2label.items() if v == "negative"][0]
-        
-        if probs[negative_index] > 0.30:
-            label = "negative"
+    # get best label
+    best_label = max(prob_dict, key=prob_dict.get)
+    confidence = prob_dict[best_label]
 
-    return label, float(confidence)
+    # ✅ FIX 1: LOW CONFIDENCE → NEUTRAL
+    if confidence < 0.60:
+        best_label = "neutral"
+
+    # ✅ FIX 2: STRONG NEGATIVE RECOVERY
+    if prob_dict["negative"] > 0.35 and prob_dict["negative"] >= prob_dict[best_label] - 0.1:
+        best_label = "negative"
+
+    # ✅ FIX 3: STRONG POSITIVE CHECK
+    if prob_dict["positive"] > 0.65:
+        best_label = "positive"
+
+    return best_label, confidence
 
 # =========================
 # USER INPUT
@@ -80,7 +90,7 @@ def predict_sentiment(sentence):
 user_input = st.text_area("✍️ Enter Urdu text:", height=150)
 
 # =========================
-# ANALYZE BUTTON
+# ANALYSIS BUTTON
 # =========================
 if st.button("Analyze Sentiment"):
 
@@ -107,9 +117,10 @@ if st.button("Analyze Sentiment"):
                 st.info(f"{sentence} → ⚖️ Neutral ({confidence:.2f})")
 
         # =========================
-        # OVERALL SENTIMENT
+        # OVERALL RESULT
         # =========================
         if results:
             overall = max(set(results), key=results.count)
             st.subheader(f"⭐ Overall Sentiment: {overall.upper()}")
+``
 
